@@ -1,0 +1,3 @@
+标题: WorkBuddy 怎么接 Grok 最新模型：自定义 OpenAI 兼容接口实测（grok-4.7）
+建议标签: WorkBuddy,Grok,OpenAI兼容,自定义模型,腾讯云CodeBuddy,grok-4.7,AI Agent
+摘要: WorkBuddy（腾讯云 CodeBuddy 团队桌面 AI Agent）如何通过自定义 OpenAI 兼容接口接入 Grok 最新模型 grok-4.7。对照实机「编辑模型」截图：供应商选自定义、接口写到 /v1/chat/completions、勾选工具调用等，测试连接后即可在对话里使用。含排错清单。

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WorkBuddy 怎么接 Grok 最新模型：自定义 OpenAI 兼容接口实测（grok-4.7）</title>
+<meta name="description" content="WorkBuddy 通过自定义 OpenAI 兼容接口接入 Grok 最新模型 grok-4.7 的实测笔记。">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f1eb;color:#272623;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.95}
+main{max-width:940px;margin:48px auto;background:#fff;padding:60px 64px;border:1px solid #e7e1d8;border-radius:18px}
+header{font-size:12px;letter-spacing:.15em;color:#1f7a4d;margin-bottom:20px}
+h1{font-size:34px;line-height:1.45;letter-spacing:-.025em;margin:0 0 28px}
+h2{font-size:24px;line-height:1.55;margin:48px 0 18px;padding-top:22px;border-top:1px solid #eee8df}
+p,li{font-size:17px}
+strong{font-weight:650}
+a{color:#0f766e}
+img{display:block;max-width:100%;height:auto;border:1px solid #e8e4de;border-radius:10px;margin:24px auto 12px}
+p:has(>em:only-child){font-size:13px;color:#756e65;text-align:center;margin-top:8px;line-height:1.7}
+blockquote{margin:26px 0;padding:12px 22px;border-left:3px solid #22c55e;background:#f3faf5;color:#3f4a42}
+blockquote p{font-size:14px;margin:6px 0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;background:#f3f0e9;border-radius:4px;padding:2px 5px;overflow-wrap:anywhere}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:24px 0;line-height:1.7}
+th,td{border:1px solid #e4ded4;padding:13px;text-align:left;overflow-wrap:anywhere}
+th{background:#f3eee5}
+hr{border:0;border-top:1px solid #eee8df;margin:36px 0}
+footer{border-top:1px solid #eee8df;margin-top:40px;padding-top:20px;color:#8b8073;font-size:13px}
+@media(max-width:680px){main{margin:0;border:0;border-radius:0;padding:30px 20px}h1{font-size:26px}h2{font-size:21px}p,li{font-size:16px}}
+</style>
+</head>
+<body>
+<main>
+<header>实测笔记 · WorkBuddy × Grok · 2026.10.30</header>
+<h1>WorkBuddy 怎么接 Grok 最新模型：自定义 OpenAI 兼容接口实测（grok-4.7）</h1>
+<p>内置积分不够用了？想直接上 Grok 最新能力，又不想等客户端把模型列表刷出来？</p>
+<p>只要手里有一把 <strong>OpenAI 兼容</strong> 网关的 Key，WorkBuddy 就能把「自定义供应商」接到 Grok。这篇按我自己实机「编辑模型」弹窗走一遍，模型名用的是 <code>grok-4.7</code>。</p>
+<blockquote><p>实测笔记。WorkBuddy 是腾讯云 CodeBuddy 团队的桌面 AI Agent，官方支持 OpenAI 兼容自定义模型。配置字段以本次截图为准；Key 已脱敏，文中不会出现真实密钥。官方说明可对照：<a href="https://www.workbuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Model" rel="noopener">WorkBuddy 模型配置</a> 与 <a href="https://cloud.tencent.com/document/product/1831/134445" rel="noopener">腾讯云文档</a>。</p></blockquote>
+<hr />
+<h2>01｜先说结论：三步就能挂上</h2>
+<p>整体就三件事——打开设置、填自定义接口、勾能力并测连：</p>
+<p><img alt="WorkBuddy 接入 Grok 三步配置示意" src="https://upload.maynor1024.live/file/1793375678416_02-three-steps-flow.png" /></p>
+<p><em>图 1：流程示意（自制），不是客户端假截图。</em></p>
+<p>入口有两种，效果一样：</p>
+<p>1. <strong>头像 → 设置 → 模型 → 添加模型</strong></p>
+<p>2. 对话里打开模型选择器，滚到底点 <strong>「配置自定义模型」</strong></p>
+<p>供应商不在预设列表时，选 <strong>自定义</strong>。自定义场景下，能力开关<strong>不会自动探测</strong>——想让 Agent 真正动手改文件、调工具，必须自己勾上 <strong>「工具调用」</strong>。这点官方也写得很清楚：选标准供应商时能力标记会自动写入；走自定义就要手勾。</p>
+<hr />
+<h2>02｜准备两样东西</h2>
+<p>1. <strong>WorkBuddy 客户端</strong>（已登录即可）</p>
+<p>2. <strong>一把 OpenAI 兼容网关的 API Key</strong></p>
+<p>我这次用的是 momoai.asia 这类网关：接口地址形如 <code><a href="https://momoai.asia/v1/chat/completions" rel="noopener">https://momoai.asia/v1/chat/completions</a></code>，模型名填控制台里的 id（本文是 <code>grok-4.7</code>）。你换成自己拿到的 Key 就行，别把 Key 发到群里或提交进公开仓库。</p>
+<p>Key 只存在本机。官方说法是保存在 <code>workbuddy/models.json</code>；老版本 / CodeBuddy 系路径里也可能看到 <code>~/.codebuddy/models.json</code>。界面升级后，旧文件里的模型一般仍能在 UI 里编辑，不必手改 JSON。</p>
+<hr />
+<h2>03｜按弹窗逐项填写（对照实机截图）</h2>
+<p>下面这张是「编辑模型」保存前的完成态，字段和勾选状态就是我实测用的：</p>
+<p><img alt="WorkBuddy 编辑模型：自定义接入 grok-4.7" src="https://upload.maynor1024.live/file/1793375635205_01-edit-model.png" /></p>
+<p><em>图 2：实机「编辑模型」弹窗。供应商=自定义；接口写到 <code>/v1/chat/completions</code>；模型名 <code>grok-4.7</code>；API Key 已脱敏。高级配置已勾：工具调用、图片输入、思考模式、上下文预测思考。</em></p>
+<p>对照表：</p>
+<table>
+<tr><th>字段</th><th>本次填写</th><th>注意</th></tr>
+<tr><td><strong>供应商</strong></td><td>自定义</td><td>仅支持 OpenAI 兼容协议 API</td></tr>
+<tr><td><strong>接口地址</strong></td><td><code><a href="https://momoai.asia/v1/chat/completions" rel="noopener">https://momoai.asia/v1/chat/completions</a></code></td><td>写完整到 <code>/v1/chat/completions</code>；标准路径一般<strong>不用</strong>开「自定义协议」</td></tr>
+<tr><td><strong>API Key</strong></td><td>填你在 momoai.asia 拿到的 Key</td><td>界面里是掩码；测连通过再保存</td></tr>
+<tr><td><strong>模型名称</strong></td><td><code>grok-4.7</code></td><td>大小写、点号都要跟网关目录一致</td></tr>
+</table>
+<p><strong>高级配置（已勾的）：</strong></p>
+<p>- <strong>工具调用</strong> —— Agent 要动手，这项必开</p>
+<p>- <strong>图片输入</strong></p>
+<p>- <strong>思考模式</strong></p>
+<p>- <strong>上下文预测思考</strong></p>
+<p>截图里还有一项没勾，名称被遮住了一截，这里不瞎猜；没勾就不要硬开。</p>
+<p>填完后点 <strong>「测试连接」</strong>，通了再点 <strong>「保存」</strong>。</p>
+<hr />
+<h2>04｜保存后怎么确认真的接上了</h2>
+<p>1. 回到对话界面，打开模型选择器</p>
+<p>2. 在 <strong>自定义</strong> 分组里找到刚存的条目（名称多半就是 <code>grok-4.7</code> 或你起的显示名）</p>
+<p>3. 选中后发一条真实任务：例如「读一下当前目录结构再改某个小文件」</p>
+<p>如果只能干聊、死活不碰本地文件，优先回头看 <strong>「工具调用」</strong> 有没有勾上——这是自定义接入里最常见的坑。</p>
+<p>接上之后，可以按这张清单快速对一遍：</p>
+<p><img alt="接上之后先核对这几项" src="https://upload.maynor1024.live/file/1793375683129_03-checklist-tips.png" /></p>
+<p><em>图 3：核对清单示意（自制）。</em></p>
+<hr />
+<h2>05｜排错（我踩过 / 见过的）</h2>
+<table>
+<tr><th>现象</th><th>先查什么</th></tr>
+<tr><td>测试连接失败</td><td>接口末尾多/少斜杠；Key 前后空格；网关是否可达</td></tr>
+<tr><td>model not found</td><td>模型名大小写、点号是否写成 <code>grok-4.7</code>（以你网关目录为准）</td></tr>
+<tr><td>能聊天但不改文件、不调工具</td><td><strong>没勾「工具调用」</strong></td></tr>
+<tr><td>请求路径怪异</td><td>标准 <code>/v1/chat/completions</code> 一般保持「自定义协议」关闭；非标准路径才考虑开启</td></tr>
+<tr><td>保存后对话里找不到</td><td>看模型选择器的「自定义」分组，或重新打开一次设置页</td></tr>
+</table>
+<hr />
+<h2>06｜小结</h2>
+<p>WorkBuddy 自定义模型的核心就三行：</p>
+<p>1. 供应商选 <strong>自定义</strong></p>
+<p>2. 接口写完整：<code><a href="https://momoai.asia/v1/chat/completions" rel="noopener">https://momoai.asia/v1/chat/completions</a></code>（或你自己的兼容网关）</p>
+<p>3. 模型名 <code>grok-4.7</code>，并勾上 <strong>工具调用</strong>（以及你需要的图片输入 / 思考相关项）→ <strong>测试连接</strong> → 保存</p>
+<p>内置列表更新再慢，也能自己把 Grok 最新档挂进桌面 Agent。</p>
+<hr />
+<p>如果后面还要换别的模型，接口和 Key 往往不用动，只改「模型名称」一行。统一 Key 调多模型，可在 <a href="https://momoai.asia" rel="noopener">https://momoai.asia</a> 申请；需要单独走 Grok 通道时，也可参考 <a href="https://chongzhi.chatgpt-plus.top/grok/" rel="noopener">https://chongzhi.chatgpt-plus.top/grok/</a> 这类实测入口（以页面当时说明为准，本文不涉及套餐细节）。</p>
+<footer>镜像页 · 配图外链至 upload.maynor1024.live · 内容与 README 一致</footer>
+</main>
+</body>
+</html>
